@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"log"
 	"log/slog"
 	"os"
 )
@@ -62,7 +61,7 @@ func main() {
 	jsonBytes, err := json.Marshal(&Transaction{
 		Value:  40.0,
 		FromId: "1",
-		ToId:   "22",
+		ToId:   "25",
 	})
 	if err != nil {
 		slog.Error("when trying to marshal Transaction",
@@ -88,18 +87,26 @@ func main() {
 		)
 		os.Exit(1)
 	}
+	go deliveryReport(deliveryChan)
 	producer.Flush(1000)
-	go func() {
-		for event := range deliveryChan {
-			message, ok := event.(*kafka.Message)
-			if !ok {
-				slog.Error("cannot publish message",
-					slog.String("context", "delivery channel"),
-					slog.String("error", message.TopicPartition.Error.Error()),
-				)
-				continue
-			}
-			log.Printf("message publish with success %v\n", message.TopicPartition)
+}
+
+func deliveryReport(ch <-chan kafka.Event) {
+	for event := range ch {
+		message, ok := event.(*kafka.Message)
+		if !ok {
+			slog.Error("cannot publish message",
+				slog.String("context", "delivery channel"),
+				slog.String("error", message.TopicPartition.Error.Error()),
+			)
+			continue
 		}
-	}()
+		slog.Info("message publish with success",
+			slog.String("context", "delivery report"),
+			slog.String("topic", *message.TopicPartition.Topic),
+			slog.Int("partition", int(message.TopicPartition.Partition)),
+			slog.String("offset", message.TopicPartition.Offset.String()),
+		)
+		// @todo save into database
+	}
 }
