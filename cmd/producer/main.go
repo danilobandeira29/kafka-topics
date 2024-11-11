@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"log"
 	"log/slog"
 	"os"
 )
@@ -51,7 +52,7 @@ func main() {
 	})
 	if err != nil {
 		slog.Error("cannot create producer",
-			slog.String("context", "createproducer"),
+			slog.String("context", "create producer"),
 			slog.String("error", err.Error()),
 		)
 		os.Exit(1)
@@ -65,25 +66,40 @@ func main() {
 	})
 	if err != nil {
 		slog.Error("when trying to marshal Transaction",
-			slog.String("context", "createmessage"),
+			slog.String("context", "create message"),
 			slog.String("error", err.Error()),
 		)
 		return
 	}
-	err = producer.Produce(&kafka.Message{
+	mgs := &kafka.Message{
 		Value: jsonBytes,
 		Key:   nil,
 		TopicPartition: kafka.TopicPartition{
 			Topic:     &topic,
 			Partition: kafka.PartitionAny,
 		},
-	}, nil)
+	}
+	deliveryChan := make(chan kafka.Event)
+	err = producer.Produce(mgs, deliveryChan)
 	if err != nil {
 		slog.Error("cannot produce a message",
-			slog.String("context", "createmessage"),
+			slog.String("context", "create message"),
 			slog.String("error", err.Error()),
 		)
 		os.Exit(1)
 	}
 	producer.Flush(1000)
+	go func() {
+		for event := range deliveryChan {
+			message, ok := event.(*kafka.Message)
+			if !ok {
+				slog.Error("cannot publish message",
+					slog.String("context", "delivery channel"),
+					slog.String("error", message.TopicPartition.Error.Error()),
+				)
+				continue
+			}
+			log.Printf("message publish with success %v\n", message.TopicPartition)
+		}
+	}()
 }
