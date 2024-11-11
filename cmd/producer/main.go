@@ -6,6 +6,8 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"log/slog"
 	"os"
+	"strconv"
+	"time"
 )
 
 type Transaction struct {
@@ -18,7 +20,10 @@ func init() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 	adminClient, err := kafka.NewAdminClient(&kafka.ConfigMap{
-		"bootstrap.servers": "kafka:9092",
+		"bootstrap.servers":   "kafka:9092",
+		"delivery.timeout.ms": strconv.FormatInt((2 * time.Second).Milliseconds(), 10),
+		"acks":                "all",
+		"enable.idempotence":  "true",
 	})
 	if err != nil {
 		slog.Error("cannot start kafka's admin client\n",
