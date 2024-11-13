@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"log/slog"
+	"math/rand"
 	"os"
 	"strconv"
 	"time"
@@ -63,10 +65,21 @@ func main() {
 	}
 	defer producer.Close()
 	topic := "balance-updated"
+	maxF := 1000.00
+	minF := 1.0
+	randFloat := rand.Float64()*(maxF-minF) + minF
+	valuePrecison2, err := strconv.ParseFloat(fmt.Sprintf("%.2f", randFloat), 64)
+	if err != nil {
+		slog.Error("cannot produce value",
+			slog.String("context", "create transaction value"),
+			slog.String("error", err.Error()),
+		)
+		os.Exit(1)
+	}
 	jsonBytes, err := json.Marshal(&Transaction{
-		Value:  40.0,
-		FromId: "1",
-		ToId:   "25",
+		Value:  valuePrecison2,
+		FromId: fmt.Sprintf("%d", rand.Int()),
+		ToId:   fmt.Sprintf("%d", rand.Int()),
 	})
 	if err != nil {
 		slog.Error("when trying to marshal Transaction",
